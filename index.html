@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notaría Digital Blockchain | Manuel Prada</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <style>
+        /* Un toque de elegancia legal */
+        body {
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+
+        .legal-gradient {
+            background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+        }
+    </style>
+</head>
+
+<body class="flex flex-col min-h-screen">
+
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold text-slate-800">Manuel Prada</h1>
+                <p class="text-xs text-slate-500 uppercase tracking-wider">Abogado & Director Jurídico</p>
+            </div>
+            <a href="https://abogado.guanes.biz" class="text-sm text-blue-800 hover:underline font-medium">
+                ← Volver al Despacho
+            </a>
+        </div>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden border border-gray-100">
+
+            <div class="legal-gradient p-6 text-white text-center">
+                <h2 class="text-2xl font-semibold mb-1">Prueba de Existencia</h2>
+                <p class="text-blue-200 text-sm">Certificación Inmutable en Solana</p>
+            </div>
+
+            <div class="p-8 space-y-6">
+
+                <div id="step-connect" class="text-center">
+                    <p class="mb-4 text-gray-600">Para iniciar, conecte su billetera digital.</p>
+                    <button onclick="connectWallet()"
+                        class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg transition-all w-full flex justify-center items-center gap-2">
+                        <span>🔐 Conectar Phantom Wallet</span>
+                    </button>
+                </div>
+
+                <div id="step-upload" class="hidden text-center space-y-4">
+                    <div class="bg-green-50 text-green-800 p-3 rounded-md text-sm mb-4">
+                        ✅ Billetera Conectada: <span id="wallet-address" class="font-mono font-bold">...</span>
+                    </div>
+
+                    <div
+                        class="border-2 border-dashed border-gray-300 rounded-lg p-8 hover:bg-gray-50 transition-colors cursor-pointer relative">
+                        <input type="file" id="file-input"
+                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="processFile()">
+                        <div class="text-gray-500">
+                            <p class="text-4xl mb-2">📄</p>
+                            <p class="font-medium">Haga clic o arrastre un archivo aquí</p>
+                            <p class="text-xs mt-1 text-gray-400">(PDF, JPG, PNG, DOCX)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="step-certify" class="hidden text-center space-y-4">
+                    <div class="text-left bg-gray-50 p-4 rounded border">
+                        <p class="text-xs text-gray-500 uppercase">Huella Digital del Archivo (SHA-256):</p>
+                        <p id="file-hash" class="font-mono text-xs break-all text-slate-800 font-bold mt-1">...</p>
+                    </div>
+
+                    <div id="pricing-info" class="py-2">
+                    </div>
+
+                    <button onclick="certifyDocument()" id="btn-certify"
+                        class="w-full legal-gradient text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:opacity-90 transition-transform transform active:scale-95">
+                        ⚖️ Certificar en Blockchain
+                    </button>
+                    <p class="text-xs text-gray-400 mt-2">Al firmar, se creará un registro permanente.</p>
+                </div>
+
+                <div id="step-success" class="hidden text-center">
+                    <div class="text-green-500 text-5xl mb-4">🎉</div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">¡Documento Certificado!</h3>
+                    <p class="text-gray-600 text-sm mb-6">La prueba de existencia ha sido grabada en la Blockchain.</p>
+
+                    <a id="solscan-link" href="#" target="_blank"
+                        class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded transition-colors mb-3">
+                        Ver Prueba en Solscan ↗
+                    </a>
+                    <button onclick="location.reload()"
+                        class="text-sm text-gray-500 hover:text-gray-800 underline">Certificar otro documento</button>
+                </div>
+
+                <p id="status-msg" class="text-center text-sm text-amber-600 font-medium h-5"></p>
+
+            </div>
+        </div>
+
+        <p class="absolute bottom-4 text-xs text-gray-400 max-w-md text-center">
+            AVISO LEGAL: Herramienta de certificación tecnológica. No constituye autenticación notarial ni otorga Fe
+            Pública. El usuario custodia sus archivos.
+        </p>
+    </main>
+
+    <script>
+        // --- CONFIGURACIÓN ---
+        // ¡CAMBIA ESTO POR TU ADDRESS REAL!
+        const OWNER_WALLET = "VTae6m4oYLaZmgNL8FhNSL5GgD6w8rHbMUMRCCXfPdy"; // <--- Tu Billetera aquí
+        const PRICE_SOL = 0.05;
+
+        // Variables globales
+        let walletKey = null;
+        let fileHash = null;
+
+        // 1. Conectar Billetera
+        async function connectWallet() {
+            const status = document.getElementById("status-msg");
+
+            if (window.solana && window.solana.isPhantom) {
+                try {
+                    status.innerText = "Conectando...";
+                    const response = await window.solana.connect();
+                    walletKey = response.publicKey.toString();
+
+                    // Mostrar siguiente paso
+                    document.getElementById("step-connect").classList.add("hidden");
+                    document.getElementById("step-upload").classList.remove("hidden");
+                    document.getElementById("wallet-address").innerText = walletKey.slice(0, 4) + "..." + walletKey.slice(-4);
+                    status.innerText = "";
+                } catch (err) {
+                    status.innerText = "Error: Usuario rechazó la conexión.";
+                }
+            } else {
+                alert("¡Necesitas la billetera Phantom para usar esta notaría!");
+                window.open("https://phantom.app/", "_blank");
+            }
+        }
+
+        // 2. Procesar Archivo (Hash SHA-256)
+        function processFile() {
+            const fileInput = document.getElementById("file-input");
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            document.getElementById("status-msg").innerText = "Calculando huella digital...";
+
+            reader.onload = function (event) {
+                const binary = event.target.result;
+                const wordArray = CryptoJS.lib.WordArray.create(binary);
+                fileHash = CryptoJS.SHA256(wordArray).toString();
+
+                // Mostrar Hash y Precio
+                document.getElementById("file-hash").innerText = fileHash;
+                document.getElementById("step-upload").classList.add("hidden");
+                document.getElementById("step-certify").classList.remove("hidden");
+                document.getElementById("status-msg").innerText = "";
+
+                checkPricing();
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 3. Verificar si es Gratis o Pago
+        function checkPricing() {
+            const hasUsedFree = localStorage.getItem("guanes_notario_used");
+            const priceDiv = document.getElementById("pricing-info");
+
+            if (!hasUsedFree) {
+                priceDiv.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded">🎁 PRIMERA VEZ GRATIS</span>`;
+            } else {
+                priceDiv.innerHTML = `<span class="text-gray-600 text-sm">Costo del servicio: <b>${PRICE_SOL} SOL</b></span>`;
+            }
+        }
+
+        // 4. Certificar (Enviar Transacción)
+        async function certifyDocument() {
+            if (!walletKey || !fileHash) return;
+            const status = document.getElementById("status-msg");
+            status.innerText = "Preparando transacción...";
+
+            const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('mainnet-beta'), 'confirmed');
+            const provider = window.solana;
+
+            try {
+                // Crear transacción
+                const transaction = new solanaWeb3.Transaction();
+                const userPubkey = new solanaWeb3.PublicKey(walletKey);
+
+                // A. Instrucción MEMO (Siempre va)
+                // Usamos el Memo Program ID oficial
+                const memoProgramId = new solanaWeb3.PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcQb");
+                transaction.add(
+                    new solanaWeb3.TransactionInstruction({
+                        keys: [],
+                        programId: memoProgramId,
+                        data: Buffer.from(`Certificado Digital [Abogado.Guanes.biz] - Hash: ${fileHash}`, 'utf-8'),
+                    })
+                );
+
+                // B. Instrucción de PAGO (Solo si no es gratis)
+                const hasUsedFree = localStorage.getItem("guanes_notario_used");
+                if (hasUsedFree) {
+                    // Validar dirección del dueño
+                    if (OWNER_WALLET === "Guanes62...") {
+                        alert("ERROR DE CONFIGURACIÓN: El abogado no ha puesto su wallet para recibir pagos.");
+                        return;
+                    }
+
+                    const ownerPubkey = new solanaWeb3.PublicKey(OWNER_WALLET);
+                    const lamports = PRICE_SOL * solanaWeb3.LAMPORTS_PER_SOL;
+
+                    transaction.add(
+                        solanaWeb3.SystemProgram.transfer({
+                            fromPubkey: userPubkey,
+                            toPubkey: ownerPubkey,
+                            lamports: lamports,
+                        })
+                    );
+                }
+
+                // Obtener bloque reciente
+                const { blockhash } = await connection.getLatestBlockhash();
+                transaction.recentBlockhash = blockhash;
+                transaction.feePayer = userPubkey;
+
+                status.innerText = "Por favor firma en tu billetera...";
+
+                // Firmar y enviar
+                const { signature } = await provider.signAndSendTransaction(transaction);
+
+                status.innerText = "Enviando a la red...";
+                await connection.confirmTransaction(signature);
+
+                // ÉXITO
+                localStorage.setItem("guanes_notario_used", "true"); // Marcar como usado
+                document.getElementById("step-certify").classList.add("hidden");
+                document.getElementById("step-success").classList.remove("hidden");
+                document.getElementById("solscan-link").href = `https://solscan.io/tx/${signature}`;
+                status.innerText = "";
+
+            } catch (err) {
+                console.error(err);
+                status.innerText = "Error: " + (err.message || "Transacción fallida");
+            }
+        }
+    </script>
+</body>
+
+</html>
